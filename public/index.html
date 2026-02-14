@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure TTS Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background-color: #2e7d32;
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .status-bar {
+                padding: 10px;
+            }
+        }
+
+        .status-bar.ready {
+            background-color: #2e7d32;
+        }
+
+        .status-bar.playing {
+            background-color: #0078d4;
+        }
+
+        .status-bar.stopped {
+            background-color: #666;
+        }
+
+        .status-bar.error {
+            background-color: #c62828;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+                border-radius: 5px;
+            }
+        }
+
+        h1 {
+            color: #333;
+            margin-top: 0;
+            font-size: 24px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 20px;
+            }
+        }
+
+        .field {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+        }
+
+        input[type="text"], input[type="password"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: Arial, sans-serif;
+        }
+
+        textarea:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        @media (max-width: 768px) {
+            textarea {
+                min-height: 120px;
+            }
+        }
+
+        .checkbox-field {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-field input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        .checkbox-field label {
+            margin: 0;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        button {
+            background-color: #0078d4;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 20px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #005a9e;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.small {
+            padding: 8px 12px;
+            font-size: 16px;
+            margin-right: 5px;
+        }
+
+        button.danger {
+            background-color: #c62828;
+        }
+
+        button.danger:hover {
+            background-color: #8e0000;
+        }
+
+        .info {
+            background-color: #e7f3ff;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        @media (max-width: 768px) {
+            .info {
+                padding: 10px;
+                font-size: 12px;
+            }
+        }
+
+        .history {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .history h2 {
+            color: #555;
+            font-size: 18px;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .history h2 {
+                font-size: 16px;
+            }
+        }
+
+        .history-item {
+            background-color: #f8f9fa;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-item-text {
+            flex: 1;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .history-item-buttons {
+            display: flex;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        .history-empty {
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-bar ready" id="statusBar">
+        ✓ Prêt
+    </div>
+
+    <div class="container">
+        <h1>🔊 Azure Text-to-Speech</h1>
+
+        <div class="info">
+            <strong>Info :</strong> Votre clé API, voix et historique sont sauvegardés localement dans votre navigateur.
+        </div>
+
+        <div class="field">
+            <label for="apiKey">Clé Azure Speech :</label>
+            <input type="password" id="apiKey" placeholder="Entrez votre clé Azure Speech" autocomplete="current-password">
+        </div>
+
+        <div class="field">
+            <label for="region">Région Azure :</label>
+            <select id="region">
+                <option value="eastus">US / East</option>
+                <option value="westeurope">EU / West</option>
+                <option value="southeastasia">Asia / South East</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="voiceName">Voix :</label>
+            <select id="voiceName" autocomplete="username">
+                <option value="en-US-AndrewMultilingualNeural">Andrew (Male) - EN-US</option>
+                <option value="en-US-AvaMultilingualNeural">Ava (Female) - EN-US</option>
+                <option value="en-US-BrianMultilingualNeural">Brian (Male) - EN-US</option>
+                <option value="en-US-EmmaMultilingualNeural">Emma (Female) - EN-US</option>
+                <option value="de-DE-SeraphinaMultilingualNeural">Seraphina (Female) - DE-DE</option>
+                <option value="de-DE-FlorianMultilingualNeural">Florian (Male) - DE-DE</option>
+                <option value="fr-FR-VivienneMultilingualNeural">Vivienne (Female) - FR-FR</option>
+                <option value="fr-FR-RemyMultilingualNeural">Remy (Male) - FR-FR</option>
+                <option value="ja-JP-MasaruMultilingualNeural">Masaru (Male) - JA-JP</option>
+                <option value="zh-CN-XiaoxiaoMultilingualNeural">Xiaoxiao (Female) - ZH-CN</option>
+                <option value="zh-CN-XiaochenMultilingualNeural">Xiaochen (Female) - ZH-CN</option>
+                <option value="zh-CN-YunyiMultilingualNeural">Yunyi (Male) - ZH-CN</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="textInput">Texte à dire :</label>
+            <textarea id="textInput" placeholder="Écrivez votre texte ici..."></textarea>
+        </div>
+
+        <div class="checkbox-field">
+            <input type="checkbox" id="sendWithEnter">
+            <label for="sendWithEnter">Envoyer avec Entrée</label>
+        </div>
+
+        <div class="checkbox-field">
+            <input type="checkbox" id="clearAfterSpeak">
+            <label for="clearAfterSpeak">Vider après la lecture</label>
+        </div>
+
+        <button onclick="saveSettings()">💾</button>
+        <button onclick="toggleSpeak()" id="speakBtn">🔊</button>
+        <button onclick="clearText()">🗑️</button>
+
+        <div class="history">
+            <div class="history-header">
+                <h2>📜 Historique</h2>
+                <button class="small danger" onclick="clearAllHistory()">Vider tout</button>
+            </div>
+            <div id="historyList">
+                <div class="history-empty">Aucun message encore</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
+    <script>
+        const SpeechSDK = window.SpeechSDK;
+        let synthesizer = null;
+        let isPlaying = false;
+        let db = null;
+
+        // Initialiser IndexedDB
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('AzureTTSDB', 1);
+
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('history')) {
+                        const objectStore = db.createObjectStore('history', { keyPath: 'id', autoIncrement: true });
+                        objectStore.createIndex('text', 'text', { unique: false });
+                        objectStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                };
+            });
+        }
+
+        // Ajouter un message à l'historique avec son audio
+        async function addToHistory(text, audioData, voiceName) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readwrite');
+                const objectStore = transaction.objectStore('history');
+                const item = {
+                    text: text,
+                    audioData: audioData,
+                    voiceName: voiceName,
+                    timestamp: Date.now()
+                };
+
+                const request = objectStore.add(item);
+                request.onsuccess = () => {
+                    resolve(request.result);
+                    updateHistoryDisplay();
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Récupérer tout l'historique
+        async function getAllHistory() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readonly');
+                const objectStore = transaction.objectStore('history');
+                const request = objectStore.getAll();
+
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Supprimer un élément de l'historique
+        async function deleteHistoryItem(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readwrite');
+                const objectStore = transaction.objectStore('history');
+                const request = objectStore.delete(id);
+
+                request.onsuccess = () => {
+                    resolve();
+                    updateHistoryDisplay();
+                    updateStatus('ready', '✓ Élément supprimé');
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Vider tout l'historique
+        async function clearAllHistory() {
+            if (!confirm('Voulez-vous vraiment supprimer tout l\'historique ?')) {
+                return;
+            }
+
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readwrite');
+                const objectStore = transaction.objectStore('history');
+                const request = objectStore.clear();
+
+                request.onsuccess = () => {
+                    resolve();
+                    updateHistoryDisplay();
+                    updateStatus('ready', '✓ Historique vidé');
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Afficher l'historique
+        async function updateHistoryDisplay() {
+            const historyList = document.getElementById('historyList');
+            const history = await getAllHistory();
+
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="history-empty">Aucun message encore</div>';
+                return;
+            }
+
+            historyList.innerHTML = '';
+
+            // Afficher les messages du plus récent au plus ancien
+            for (let i = history.length - 1; i >= 0; i--) {
+                const item = history[i];
+                const div = document.createElement('div');
+                div.className = 'history-item';
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'history-item-text';
+                textDiv.textContent = item.text;
+
+                const buttonsDiv = document.createElement('div');
+                buttonsDiv.className = 'history-item-buttons';
+
+                const playBtn = document.createElement('button');
+                playBtn.className = 'small';
+                playBtn.textContent = '🔊';
+                playBtn.onclick = () => playFromCache(item);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'small danger';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.onclick = () => deleteHistoryItem(item.id);
+
+                buttonsDiv.appendChild(playBtn);
+                buttonsDiv.appendChild(deleteBtn);
+
+                div.appendChild(textDiv);
+                div.appendChild(buttonsDiv);
+
+                historyList.appendChild(div);
+            }
+        }
+
+        // Jouer depuis le cache
+        async function playFromCache(item) {
+            if (isPlaying) {
+                return;
+            }
+
+            try {
+                isPlaying = true;
+                setTextInputEnabled(false);
+                updateSpeakButton();
+                updateStatus('playing', '▶️ Lecture depuis le cache...');
+
+                // Créer un blob depuis les données audio
+                const blob = new Blob([item.audioData], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                const audio = new Audio(url);
+
+                audio.onended = () => {
+                    URL.revokeObjectURL(url);
+                    isPlaying = false;
+                    setTextInputEnabled(true);
+                    updateSpeakButton();
+                    updateStatus('ready', '✓ Lecture terminée');
+                };
+
+                audio.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    isPlaying = false;
+                    setTextInputEnabled(true);
+                    updateSpeakButton();
+                    updateStatus('error', '❌ Erreur de lecture audio');
+                };
+
+                await audio.play();
+            } catch (error) {
+                isPlaying = false;
+                setTextInputEnabled(true);
+                updateSpeakButton();
+                updateStatus('error', '❌ Erreur : ' + error.message);
+            }
+        }
+
+        // Fonction pour mettre à jour la barre de statut
+        function updateStatus(status, message) {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.className = 'status-bar ' + status;
+            statusBar.textContent = message;
+        }
+
+        // Fonction pour activer/désactiver la zone de texte
+        function setTextInputEnabled(enabled) {
+            document.getElementById('textInput').disabled = !enabled;
+        }
+
+        // Fonction pour mettre à jour l'icône du clavier
+        function updateKeyboardIcon() {
+            const sendWithEnter = document.getElementById('sendWithEnter').checked;
+            const textInput = document.getElementById('textInput');
+
+            if (sendWithEnter) {
+                textInput.setAttribute('enterkeyhint', 'send');
+            } else {
+                textInput.setAttribute('enterkeyhint', 'enter');
+            }
+        }
+
+        // Fonction pour basculer entre play et stop
+        function toggleSpeak() {
+            if (isPlaying) {
+                stopSpeaking();
+            } else {
+                speak();
+            }
+        }
+
+        // Fonction pour mettre à jour le bouton play/stop
+        function updateSpeakButton() {
+            const btn = document.getElementById('speakBtn');
+            if (isPlaying) {
+                btn.textContent = '⏹️';
+            } else {
+                btn.textContent = '🔊';
+            }
+        }
+
+        // Charger les paramètres sauvegardés
+        window.onload = async function() {
+            // Initialiser la base de données
+            await initDB();
+            await updateHistoryDisplay();
+
+            const savedKey = localStorage.getItem('azureApiKey');
+            const savedRegion = localStorage.getItem('azureRegion');
+            const savedVoice = localStorage.getItem('azureVoiceName');
+            const savedEnterMode = localStorage.getItem('sendWithEnter');
+            const savedClearMode = localStorage.getItem('clearAfterSpeak');
+
+            if (savedKey) document.getElementById('apiKey').value = savedKey;
+            if (savedRegion) document.getElementById('region').value = savedRegion;
+            if (savedVoice) document.getElementById('voiceName').value = savedVoice;
+            if (savedEnterMode === 'true') document.getElementById('sendWithEnter').checked = true;
+            if (savedClearMode === 'true') document.getElementById('clearAfterSpeak').checked = true;
+
+            // Mettre à jour l'icône du clavier
+            updateKeyboardIcon();
+
+            // Focus sur le textarea pour commencer à taper directement
+            document.getElementById('textInput').focus();
+        };
+
+        function saveSettings() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const region = document.getElementById('region').value.trim();
+            const voiceName = document.getElementById('voiceName').value.trim();
+            const sendWithEnter = document.getElementById('sendWithEnter').checked;
+            const clearAfterSpeak = document.getElementById('clearAfterSpeak').checked;
+
+            if (!apiKey || !region || !voiceName) {
+                updateStatus('error', '❌ Veuillez remplir tous les champs de configuration');
+                return;
+            }
+
+            localStorage.setItem('azureApiKey', apiKey);
+            localStorage.setItem('azureRegion', region);
+            localStorage.setItem('azureVoiceName', voiceName);
+            localStorage.setItem('sendWithEnter', sendWithEnter);
+            localStorage.setItem('clearAfterSpeak', clearAfterSpeak);
+
+            updateStatus('ready', '✓ Paramètres sauvegardés avec succès');
+        }
+
+        function clearText() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('textInput').focus();
+        }
+
+        function speak() {
+            if (isPlaying) {
+                return;
+            }
+
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const region = document.getElementById('region').value.trim();
+            const voiceName = document.getElementById('voiceName').value.trim();
+            const text = document.getElementById('textInput').value.trim();
+            const clearAfterSpeak = document.getElementById('clearAfterSpeak').checked;
+
+            if (!apiKey || !region || !voiceName) {
+                updateStatus('error', '❌ Veuillez configurer la clé API, la région et la voix');
+                return;
+            }
+
+            if (!text) {
+                updateStatus('error', '❌ Veuillez entrer du texte à lire');
+                return;
+            }
+
+            try {
+                const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(apiKey, region);
+                speechConfig.speechSynthesisVoiceName = voiceName;
+
+                const synthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig, null);
+
+                isPlaying = true;
+                setTextInputEnabled(false);
+                updateSpeakButton();
+                updateStatus('playing', '▶️ Génération audio...');
+
+                synthesizer.speakTextAsync(
+                    text,
+                    async result => {
+                        if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
+                            // Récupérer les données audio
+                            const audioData = result.audioData;
+
+                            // Sauvegarder dans l'historique avec le cache audio
+                            await addToHistory(text, audioData, voiceName);
+
+                            // Jouer l'audio
+                            const blob = new Blob([audioData], { type: 'audio/wav' });
+                            const url = URL.createObjectURL(blob);
+                            const audio = new Audio(url);
+
+                            audio.onended = () => {
+                                URL.revokeObjectURL(url);
+                                isPlaying = false;
+                                setTextInputEnabled(true);
+                                updateSpeakButton();
+                                updateStatus('ready', '✓ Lecture terminée');
+                                if (clearAfterSpeak) {
+                                    clearText();
+                                }
+                            };
+
+                            audio.onerror = () => {
+                                URL.revokeObjectURL(url);
+                                isPlaying = false;
+                                setTextInputEnabled(true);
+                                updateSpeakButton();
+                                updateStatus('error', '❌ Erreur de lecture audio');
+                            };
+
+                            updateStatus('playing', '▶️ Lecture en cours...');
+                            await audio.play();
+                        } else {
+                            updateStatus('error', '❌ Erreur de synthèse : ' + result.errorDetails);
+                            isPlaying = false;
+                            setTextInputEnabled(true);
+                            updateSpeakButton();
+                        }
+                        synthesizer.close();
+                    },
+                    error => {
+                        updateStatus('error', '❌ Erreur : ' + error);
+                        synthesizer.close();
+                        isPlaying = false;
+                        setTextInputEnabled(true);
+                        updateSpeakButton();
+                    }
+                );
+            } catch (error) {
+                updateStatus('error', '❌ Erreur d\'initialisation : ' + error.message);
+                isPlaying = false;
+                setTextInputEnabled(true);
+                updateSpeakButton();
+            }
+        }
+
+        function stopSpeaking() {
+            // Pour arrêter l'audio en cours (à améliorer si besoin)
+            isPlaying = false;
+            setTextInputEnabled(true);
+            updateSpeakButton();
+            updateStatus('stopped', '⏸️ Lecture arrêtée');
+        }
+
+        // Gestion des touches Enter et Ctrl+Enter
+        document.getElementById('textInput').addEventListener('keydown', function(e) {
+            if (isPlaying) {
+                return;
+            }
+
+            const sendWithEnter = document.getElementById('sendWithEnter').checked;
+
+            if (e.key === 'Enter') {
+                if (sendWithEnter && !e.shiftKey && !e.ctrlKey) {
+                    e.preventDefault();
+                    speak();
+                } else if (e.ctrlKey) {
+                    e.preventDefault();
+                    speak();
+                }
+            }
+        });
+
+        // Sauvegarder automatiquement et mettre à jour l'icône du clavier quand on change les checkboxes
+        document.getElementById('sendWithEnter').addEventListener('change', function() {
+            localStorage.setItem('sendWithEnter', this.checked);
+            updateKeyboardIcon();
+        });
+
+        document.getElementById('clearAfterSpeak').addEventListener('change', function() {
+            localStorage.setItem('clearAfterSpeak', this.checked);
+        });
+    </script>
+</body>
+</html>
