@@ -1,0 +1,15 @@
+{
+  "name": "azure-simple-tts",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.22.1"
+  },
+  "description": "Simple Azure TTS interface",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["azure", "tts", "text-to-speech", "vanilla-js", "no-backend"],
+  "author": "DarthJahus",
+  "license": "Apache-2.0"
+}
